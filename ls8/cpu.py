@@ -7,31 +7,75 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        pass
+        # Program Counter
+        # Holds address of currently executing instruction
+        self.pc = 0 
 
-    def load(self):
-        """Load a program into memory."""
+        # Instruction Register
+        # Holds currently executing instruction
+        self.ir = 0 
 
+        # Memory Address Register
+        # Holds address of memory to read from / write to
+        # self.mar = 0 
+
+        # Memory Data Register
+        # Holds data to write / just read
+        # self.mdr = 0 
+
+        # Flag register
+        # Holds current flags status, changed on CMP
+        # Format: 00000LGE - Less Than, Greater Than, Equal
+        # AAA -> BBB comparison
+        self.fl = 0 
+
+        # RAM - LS8 has 1 byte addressing so only 256 possible locations to read from / write to
+        self.ram = [0] * 256 
+
+        # General Purpose Registers
+        # The following are reserved:
+        # R5 - Interrupt Mask (IM)
+        # R6 - Interrupt Status (IS)
+        # R7 - Stack Pointer (SP)
+        self.reg = [0] * 8
+
+        self.reg[7] = 0xF4
+
+        # All the instructions understoon by the CPU
+        self.instructions = {
+            # HLT
+            0x01: lambda: exit(),
+            # LDI
+            0x82: lambda r, i: self._LDI(r, i),
+            # PRN
+            0x47: lambda r: self._PRN(r)
+        }
+
+
+    def load(self, program):
+        """Loads a program into memory."""
         address = 0
-
-        # For now, we've just hardcoded a program:
-
-        program = [
-            # From print8.ls8
-            0b10000010, # LDI R0,8
-            0b00000000,
-            0b00001000,
-            0b01000111, # PRN R0
-            0b00000000,
-            0b00000001, # HLT
-        ]
 
         for instruction in program:
             self.ram[address] = instruction
             address += 1
 
 
-    def alu(self, op, reg_a, reg_b):
+    def _ram_read(self, mar):
+        """
+        Reads and returns data from RAM at address specified by the MAR
+        """
+        return self.ram[mar]
+
+
+    def _ram_write(self, mar, mdr):
+        """
+        Writes data from MDR into RAM at address specified by the MAR
+        """
+        self.ram[mar] = mdr
+
+
+    def _alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
         if op == "ADD":
@@ -40,7 +84,8 @@ class CPU:
         else:
             raise Exception("Unsupported ALU operation")
 
-    def trace(self):
+
+    def _trace(self):
         """
         Handy function to print out the CPU state. You might want to call this
         from run() if you need help debugging.
@@ -50,9 +95,9 @@ class CPU:
             self.pc,
             #self.fl,
             #self.ie,
-            self.ram_read(self.pc),
-            self.ram_read(self.pc + 1),
-            self.ram_read(self.pc + 2)
+            self._ram_read(self.pc),
+            self._ram_read(self.pc + 1),
+            self._ram_read(self.pc + 2)
         ), end='')
 
         for i in range(8):
@@ -60,6 +105,82 @@ class CPU:
 
         print()
 
+
+    def _read_instruction(self):
+        """
+        Load instruction from RAM[pc] into the IR 
+        """
+        self.ir = self._ram_read(self.pc)
+
+
+    def _execute_instruction(self):
+        """
+        Executes instruction located in the IR
+        """
+        # This will pull the correct function for the provided instruction
+        execute = self.instructions.get(self.ir, None)
+        
+        # Check if valid instruction
+        if execute is not None:
+            # Setup operands
+            operand_a, operand_b = 0, 0
+
+            # How many operands does this instruction require?
+            operands = (0b11000000 & self.ir) >> 6
+
+            # Get operands from memory
+            if operands == 1:
+                operand_a = self._ram_read(self.pc + 1)
+
+                # Execute instruction with operand
+                execute(operand_a)
+            elif operands == 2:
+                operand_a = self._ram_read(self.pc + 1)
+                operand_b = self._ram_read(self.pc + 2)
+
+                # Execute instruction with operands
+                execute(operand_a, operand_b)
+            else:
+                # Instruction takes no operands
+                execute()
+        else:
+            print("Unknown instruction encountered.")
+            self._trace()
+            exit(1)
+
+        # Increment program counter by instruction length
+        # Determined by last 2 bits of instruction for the operands + 1 for the instruction itself
+        self.pc += 1 + operands
+
+
     def run(self):
-        """Run the CPU."""
-        pass
+        """Starts the emulator execution loop"""
+        while True:
+            # Load instruction from RAM at address PC into IR
+            self._read_instruction()
+            # Execute instruction loaded in IR
+            self._execute_instruction()
+
+    """
+    ******************************************************
+    INSTRUCTION DEFINITIONS
+    ******************************************************
+    """
+    def _HLT(self):
+        """
+        Halts program execution
+        """
+        exit()
+
+    def _LDI(self, r, i):
+        """
+        Stores immediate i into register r
+        """
+        self.reg[r] = i
+
+    def _PRN(self, r):
+        """
+        Prints value stored in register r
+        """
+        print(self.reg[r])
+    
