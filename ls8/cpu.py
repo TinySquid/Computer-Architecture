@@ -60,9 +60,20 @@ class CPU:
         program_file = open(input_file, "r")
 
         for line in program_file:
+            # Remove whitespace
+            line = line.strip()
+
+            # Ignore blank lines
+            if not line:
+                continue
+
+            # Ignore lines that start with comments
+            if line[0] == "#":
+                continue
+
             # All instructions are 1 byte so just
             # take the first 8 chars and convert
-            # to binary number
+            # to a binary number
             instruction = int(line[:8], 2)
 
             # Insert instruction into memory
