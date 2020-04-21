@@ -42,15 +42,29 @@ class CPU:
 
         self.reg[7] = 0xF4
 
-        # All the instructions understoon by the CPU
+        # All non-alu instructions understood by the CPU
         self.instructions = {
             # HLT
             0x01: lambda: exit(),
             # LDI
-            0x82: lambda r, i: self._LDI(r, i),
+            0x82: lambda: self._LDI(self._operand_a, self._operand_b),
             # PRN
-            0x47: lambda r: self._PRN(r),
+            0x47: lambda: self._PRN(self._operand_a),
         }
+
+        # All alu instructions
+        self.alu_instructions = {
+            # MUL
+            0xA2: lambda: self._ALU_MUL(self._operand_a, self._operand_b),
+        }
+
+    @property
+    def _operand_a(self):
+        return self.ram[self.pc + 1]
+
+    @property
+    def _operand_b(self):
+        return self.ram[self.pc + 2]
 
     def load(self, input_file):
         """Loads a program from a file into memory."""
@@ -96,14 +110,19 @@ class CPU:
         """
         self.ram[mar] = mdr
 
-    def _alu(self, op, reg_a, reg_b):
-        """ALU operations."""
+    def _alu(self, op):
+        """Executes ALU operations"""
 
-        if op == "ADD":
-            self.reg[reg_a] += self.reg[reg_b]
-        # elif op == "SUB": etc
+        # This will pull the correct function for the provided alu instruction
+        execute = self.alu_instructions.get(op, None)
+
+        # Check if valid instruction
+        if execute is not None:
+            execute()
         else:
-            raise Exception("Unsupported ALU operation")
+            print("Unsupported ALU operation.")
+            self._trace()
+            exit(1)
 
     def _trace(self):
         """
@@ -139,36 +158,30 @@ class CPU:
         """
         Executes instruction located in the IR
         """
-        # This will pull the correct function for the provided instruction
-        execute = self.instructions.get(self.ir, None)
+        # Get instruction from IR
+        instruction = self.ir
 
-        # Check if valid instruction
-        if execute is not None:
-            # Setup operands
-            operand_a, operand_b = 0, 0
+        # How many operands does this instruction require?
+        # Used for incrementing the PC by correct amount
+        operands = (0b11000000 & self.ir) >> 6
 
-            # How many operands does this instruction require?
-            operands = (0b11000000 & self.ir) >> 6
+        # Is this an ALU operation?
+        is_alu_op = True if 0b00100000 & self.ir else False
 
-            # Get operands from memory
-            if operands == 1:
-                operand_a = self._ram_read(self.pc + 1)
-
-                # Execute instruction with operand
-                execute(operand_a)
-            elif operands == 2:
-                operand_a = self._ram_read(self.pc + 1)
-                operand_b = self._ram_read(self.pc + 2)
-
-                # Execute instruction with operands
-                execute(operand_a, operand_b)
-            else:
-                # Instruction takes no operands
-                execute()
+        # Make the ALU handle instruction if this is an ALU operation
+        if is_alu_op:
+            self._alu(instruction)
         else:
-            print("Unknown instruction encountered.")
-            self._trace()
-            exit(1)
+            # This will pull the correct function for the provided non-alu instruction
+            execute = self.instructions.get(self.ir, None)
+
+            # Check if valid instruction
+            if execute is not None:
+                execute()
+            else:
+                print("Unknown instruction encountered.")
+                self._trace()
+                exit(1)
 
         # Increment program counter by instruction length
         # Determined by last 2 bits of instruction for the operands + 1 for the instruction itself
@@ -210,3 +223,15 @@ class CPU:
         Prints value stored in register r
         """
         print(self.reg[r])
+
+    """
+    ******************************************************
+    ALU INSTRUCTION DEFINITIONS
+    ******************************************************
+    """
+
+    def _ALU_MUL(self, ra, rb):
+        """
+        Multiplies registerA with registerB, stores result in registerA
+        """
+        self.reg[ra] *= self.reg[rb]
