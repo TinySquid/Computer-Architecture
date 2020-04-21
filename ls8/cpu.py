@@ -40,6 +40,10 @@ class CPU:
         # R7 - Stack Pointer (SP)
         self.reg = [0] * 8
 
+        self.imr = 5
+        self.isr = 6
+        self.spr = 7
+
         self.reg[7] = 0xF4
 
         # All non-alu instructions understood by the CPU
@@ -48,6 +52,10 @@ class CPU:
             0x01: lambda: exit(),
             # LDI
             0x82: lambda: self._LDI(self._operand_a, self._operand_b),
+            # PUSH
+            0x45: lambda: self._PUSH(self._operand_a),
+            # POP
+            0x46: lambda: self._POP(self._operand_a),
             # PRN
             0x47: lambda: self._PRN(self._operand_a),
         }
@@ -223,6 +231,25 @@ class CPU:
         Prints value stored in register r
         """
         print(self.reg[r])
+
+    def _PUSH(self, r):
+        """
+        Push value in register r onto stack
+        """
+        # Decrement stack pointer
+        self.reg[self.spr] -= 1
+        # Copy value from register r to stack at address from SP
+        self.ram[self.reg[self.spr]] = self.reg[r]
+
+    def _POP(self, r):
+        """
+        Pop value at top of stack into register r
+        """
+        # Copy value from address pointed to by SP into register r
+        self.reg[r] = self.ram[self.reg[self.spr]]
+
+        # Increment SP
+        self.reg[self.spr] += 1
 
     """
     ******************************************************
