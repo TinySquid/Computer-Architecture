@@ -3,27 +3,32 @@
 """Main."""
 
 import sys
+from os import path
+
 from cpu import *
 
 
-# For now, we've just hardcoded a program:
-program = [
-    # From print8.ls8
-    0b10000010, # LDI R0,8
-    0b00000000,
-    0b00001000,
-    0b01000111, # PRN R0
-    0b00000000,
-    0b00000001, # HLT
-]
+def print_usage(error):
+    """
+    Prints usage statement along with any error if provided
+    """
+    if error:
+        print("error: " + error)
+    print("usage: ls8.py input_file")
 
-# HLT = 0b00000001
-# LDI = 0b10000010
-# PRN = 0b01000111
 
-# Create instance
-cpu = CPU()
-# Load program into RAM
-cpu.load(program)
-# Start execution loop
-cpu.run()
+if __name__ == "__main__":
+    if len(sys.argv) == 2:
+        # Valid arguments supplied, but does the input_file exist?
+        input_file = sys.argv[1]
+        if path.exists():
+            # Create instance
+            cpu = CPU()
+            # Load program into RAM
+            cpu.load(input_file)
+            # Start execution loop
+            cpu.run()
+        else:
+            print_usage("input_file not found")
+    else:
+        print_usage("missing required arguments")
