@@ -21,7 +21,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 2:
         # Valid arguments supplied, but does the input_file exist?
         input_file = sys.argv[1]
-        if path.exists():
+        if path.exists(input_file):
             # Create instance
             cpu = CPU()
             # Load program into RAM
