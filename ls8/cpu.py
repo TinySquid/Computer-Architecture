@@ -68,8 +68,32 @@ class CPU:
         self.alu_instructions = {
             # ADD
             0xA0: lambda: self._ALU_ADD(self._operand_a, self._operand_b),
+            # SUB
+            0xA1: lambda: self._ALU_SUB(self._operand_a, self._operand_b),
             # MUL
             0xA2: lambda: self._ALU_MUL(self._operand_a, self._operand_b),
+            # DIV
+            0xA3: lambda: self._ALU_DIV(self._operand_a, self._operand_b),
+            # MOD
+            0xA4: lambda: self._ALU_MOD(self._operand_a, self._operand_b),
+            # INC
+            0x65: lambda: self._ALU_INC(self._operand_a),
+            # DEC
+            0x66: lambda: self._ALU_DEC(self._operand_a),
+            # SHL
+            0xAC: lambda: self._ALU_SHL(self._operand_a, self._operand_b),
+            # SHR
+            0xAD: lambda: self._ALU_SHR(self._operand_a, self._operand_b),
+            # AND
+            0xA8: lambda: self._ALU_AND(self._operand_a, self._operand_b),
+            # OR
+            0xAA: lambda: self._ALU_OR(self._operand_a, self._operand_b),
+            # XOR
+            0xAB: lambda: self._ALU_XOR(self._operand_a, self._operand_b),
+            # NOT
+            0x69: lambda: self._ALU_NOT(self._operand_a),
+            # CMP
+            0xA7: lambda: self._ALU_CMP(self._operand_a, self._operand_b),
         }
 
     @property
@@ -288,15 +312,106 @@ class CPU:
     ALU INSTRUCTION DEFINITIONS
     ******************************************************
     """
+    def _ALU_ADD(self, ra, rb):
+        """
+        Adds registerA with registerB, stores result in registerA
+        """
+        self.reg[ra] += self.reg[rb]
 
+    def _ALU_SUB(self, ra, rb):
+        """
+        Subtracts registerB from registerA, stores result in registerA        
+        """
+        self.reg[ra] = self.reg[ra] - self.reg[rb]
+    
     def _ALU_MUL(self, ra, rb):
         """
         Multiplies registerA with registerB, stores result in registerA
         """
         self.reg[ra] *= self.reg[rb]
 
-    def _ALU_ADD(self, ra, rb):
+    def _ALU_DIV(self, ra, rb):
         """
-        Adds registerA with registerB, stores result in registerA
+        Divides registerA with registerB, stores value in registerA
+        Halts on division by 0
         """
-        self.reg[ra] += self.reg[rb]
+        if self.reg[rb] == 0:
+            print("Cannot divide by 0!")
+            exit()
+        else:
+            self.reg[ra] = self.reg[ra] // self.reg[rb]
+    
+    def _ALU_MOD(self, ra, rb):
+        """
+        Divides registerA with registerB, stores remainder in registerA
+        Halts on division by 0
+        """
+        if self.reg[rb] == 0:
+            print("Cannot divide by 0!")
+            exit()
+        else:
+            self.reg[ra] = self.reg[ra] % self.reg[rb]
+
+    def _ALU_INC(self, r):
+        """
+        Increments register r        
+        """
+        self.reg[r] += 1
+        
+    def _ALU_DEC(self, r):
+        """
+        Decrements register r        
+        """
+        self.reg[r] -= 1
+
+    def _ALU_AND(self, ra, rb):
+        """
+        Bitwise AND the values in registerA with registerB, stores result in registerA
+        """
+        self.reg[ra] = self.reg[ra] & self.reg[rb]
+
+    def _ALU_OR(self, ra, rb):
+        """
+        Bitwise OR the values in registerA with registerB, stores result in registerA
+        """
+        self.reg[ra] = self.reg[ra] | self.reg[rb]
+
+    def _ALU_XOR(self, ra, rb):
+        """
+        Bitwise XOR between values in registerA and registerB, stores result in registerA
+        """
+        self.reg[ra] = self.reg[ra] ^ self.reg[rb]
+
+    def _ALU_NOT(self, r):
+        """
+        Bitwise NOT the value in register r
+        """
+        self.reg[r] = ~self.reg[r]
+
+    def _ALU_SHL(self, ra, rb):
+        """
+        Shifts value in registerA left by number of bits in registerB
+        """
+        self.reg[ra] = self.reg[ra] << self.reg[rb]
+    
+    def _ALU_SHR(self, ra, rb):
+        """
+        Shifts value in registerA right by number of bits in registerB
+        """
+        self.reg[ra] = self.reg[ra] >> self.reg[rb]
+
+    def _ALU_CMP(self, ra, rb):
+        """
+        Flag register format:
+        00000LGE
+        L: Less Than
+        G: Greater Than
+        E: Equal To
+
+        """
+        if self.reg[ra] > self.reg[rb]:
+            self.fl = 0b00000010
+        elif self.reg[ra] < self.reg[rb]:
+            self.fl = 0b00000100
+        else: # ==
+            self.fl = 0b00000001
