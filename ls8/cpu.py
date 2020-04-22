@@ -1,6 +1,7 @@
 """CPU functionality."""
 
 import sys
+from time import time
 
 
 class CPU:
@@ -46,6 +47,11 @@ class CPU:
 
         self.reg[7] = 0xF4
 
+        # Interrupt Vector Table
+        self.ivt = [0xF8, 0xF9, 0xFA, 0xFB, 0xFC, 0xFD, 0xFE, 0xFF]
+
+        self.interrupts_enabled = True
+
         # All non-alu instructions understood by the CPU
         self.instructions = {
             # NOP
@@ -87,7 +93,7 @@ class CPU:
             # JGE
             0x5A: lambda: self._JGE(self._operand_a),
             # JNE
-            0x56: lambda: self._JNE(self._operand_a)
+            0x56: lambda: self._JNE(self._operand_a),
         }
 
         # All alu instructions
@@ -121,6 +127,14 @@ class CPU:
             # CMP
             0xA7: lambda: self._ALU_CMP(self._operand_a, self._operand_b),
         }
+
+    @staticmethod
+    def _set_nth_bit(b, n):
+        return b | 1 << n
+
+    @staticmethod
+    def _unset_nth_bit(b, n):
+        return b & ~(1 << n)
 
     @property
     def _operand_a(self):
@@ -187,6 +201,42 @@ class CPU:
             print("Unsupported ALU operation.")
             self._trace()
             exit(1)
+
+    def _handle_interrupts(self):
+        """
+        Checks and services interrupts from the interrupt service register
+        """
+
+        # Get active and enabled interrupts
+        masked_interrupts = self.reg[self.imr] & self.reg[self.isr]
+
+        for i in range(1, len(self.ivt) + 1):
+            # Check interrupt
+            i_bit = i & masked_interrupts
+
+            # Is interrupt active?
+            if i_bit:
+                # Disable interrupt handling until this one is serviced
+                self.interrupts_enabled = False
+
+                # Clear interrupt bit in IS
+                self.reg[self.isr] = self._unset_nth_bit(self.reg[self.isr], i - 1)
+
+                # Push processor state on stack
+                # PC and flag register
+                self._PUSH(r=None, value=self.pc)
+                # print("Stored PC", self.pc, "on stack")
+                self._PUSH(r=None, value=self.fl)
+
+                # Push all registers except IMR
+                for r in range(0, 7):
+                    self._PUSH(r=None, value=self.reg[r])
+
+                # Jump to interrupt handler
+                self.pc = self.ram[self.ivt[i - 1]]
+
+                # Exit interrupt checking loop to service current interrupt
+                break
 
     def _trace(self):
         """
@@ -258,7 +308,19 @@ class CPU:
 
     def run(self, trace_cycle=False):
         """Starts the emulator execution loop"""
+
+        # Timer setup
+        timer_start = time()
+        # timer_error_margin = 0.05  # 5% error margin...
+
+        # Enable timer interrupt
+        # self.reg[self.imr] = self._set_nth_bit(self.reg[self.imr], 0)
+
         while True:
+            # Prior to instruction fetch, check interrupts if enabled
+            if self.interrupts_enabled:
+                self._handle_interrupts()
+
             # Load instruction from RAM at address PC into IR
             self._read_instruction()
 
@@ -268,6 +330,14 @@ class CPU:
 
             # Execute instruction loaded in IR
             self._execute_instruction()
+
+            # Activate timer interrupt if 1 second has past
+            timer_check = time()
+            if timer_check - timer_start > 1:
+                # INT
+                self.reg[self.isr] = self._set_nth_bit(self.reg[self.isr], 0)
+                # Reset timer
+                timer_start = time()
 
     """
     ******************************************************
@@ -315,9 +385,10 @@ class CPU:
         """
         self.ram[self.reg[ra]] = self.reg[rb]
 
-    def _PUSH(self, r):
+    def _PUSH(self, r, value=None):
         """
-        Push value in register r onto stack
+        Push value in register r onto stack, or, a directly passed value instead.
+        Makes code DRY to just have 1 push function
         """
 
         # Decrement SP
@@ -327,15 +398,20 @@ class CPU:
         else:
             self.reg[self.spr] -= 1
 
-        # Copy value from register r to stack at address SP
-        self.ram[self.reg[self.spr]] = self.reg[r]
+        if value is not None:
+            # We want to set a direct value instead of a register
+            self.ram[self.reg[self.spr]] = value
+        else:
+            # Copy value from register r to stack at address SP
+            self.ram[self.reg[self.spr]] = self.reg[r]
 
-    def _POP(self, r):
+    def _POP(self, r, ret=False):
         """
-        Pop value at top of stack into register r
+        Pop value at top of stack into register r, or, a directly passed value instead.
+        Makes code DRY to just have 1 pop function
         """
-        # Copy value from address pointed to by SP into register r
-        self.reg[r] = self.ram[self.reg[self.spr]]
+        # Temp SP so we can handle a return while still updating SP
+        sp = self.reg[self.spr]
 
         # Increment SP
         if self.reg[self.spr] == 0xFF:
@@ -343,6 +419,13 @@ class CPU:
             self.reg[self.spr] = 0
         else:
             self.reg[self.spr] += 1
+
+        if ret:
+            # Just return value popped from stack
+            return self.ram[sp]
+        else:
+            # Copy value from address pointed to by SP into register r
+            self.reg[r] = self.ram[sp]
 
     def _CALL(self, r):
         """
@@ -369,13 +452,29 @@ class CPU:
         Issue interrupt number stored in register r
         Sets nth_bit in register IS
         """
-        pass
+        self.reg[self.isr] = self._set_nth_bit(self.reg[r], 1)
 
     def _IRET(self):
         """
         Returns from interrupt (Restores processor state)
+        
+        Registers R6-R0 are popped off the stack.
+        The FL register is popped off the stack.
+        The return address is popped off the stack and stored in PC.
+        Interrupts are re-enabled
         """
-        pass
+        # Pop registers R6-R0 off stack into respective places
+        for r in range(6, -1, -1):
+            self.reg[r] = self._POP(r=None, ret=True)
+
+        # Pop FL reg
+        self.fl = self._POP(r=None, ret=True)
+
+        # Pop return address into PC
+        self.pc = self._POP(r=None, ret=True)
+
+        # Re-enable interrupts
+        self.interrupts_enabled = True
 
     def _JMP(self, r):
         """
@@ -442,6 +541,7 @@ class CPU:
     ALU INSTRUCTION DEFINITIONS
     ******************************************************
     """
+
     def _ALU_ADD(self, ra, rb):
         """
         Adds registerA with registerB, stores result in registerA
@@ -453,7 +553,7 @@ class CPU:
         Subtracts registerB from registerA, stores result in registerA        
         """
         self.reg[ra] = (self.reg[ra] - self.reg[rb]) & 0b11111111
-    
+
     def _ALU_MUL(self, ra, rb):
         """
         Multiplies registerA with registerB, stores result in registerA
@@ -470,7 +570,7 @@ class CPU:
             exit()
         else:
             self.reg[ra] = self.reg[ra] // self.reg[rb]
-    
+
     def _ALU_MOD(self, ra, rb):
         """
         Divides registerA with registerB, stores remainder in registerA
@@ -487,7 +587,7 @@ class CPU:
         Increments register r        
         """
         self.reg[r] = (self.reg[r] + 1) & 0b11111111
-        
+
     def _ALU_DEC(self, r):
         """
         Decrements register r        
@@ -523,7 +623,7 @@ class CPU:
         Shifts value in registerA left by number of bits in registerB
         """
         self.reg[ra] = (self.reg[ra] << self.reg[rb]) & 0b11111111
-    
+
     def _ALU_SHR(self, ra, rb):
         """
         Shifts value in registerA right by number of bits in registerB
@@ -532,16 +632,17 @@ class CPU:
 
     def _ALU_CMP(self, ra, rb):
         """
+        Compares registerA with registerB, sets flags in FL register
+
         Flag register format:
         00000LGE
         L: Less Than
         G: Greater Than
         E: Equal To
-
         """
         if self.reg[ra] > self.reg[rb]:
             self.fl = 0b00000010
         elif self.reg[ra] < self.reg[rb]:
             self.fl = 0b00000100
-        else: # ==
+        else:  # ==
             self.fl = 0b00000001
