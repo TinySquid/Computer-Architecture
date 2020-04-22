@@ -255,17 +255,39 @@ class CPU:
         """
         exit()
 
-    def _LDI(self, r, i):
+    def _NOP(self):
+        # Do nothing
+        pass
+
+    def _PRA(self, r):
         """
-        Stores immediate i into register r
+        Prints register r contents as an ASCII character
         """
-        self.reg[r] = i
+        print(chr(self.reg[r]))
 
     def _PRN(self, r):
         """
         Prints value stored in register r
         """
         print(self.reg[r])
+
+    def _LD(self, ra, rb):
+        """
+        Loads registerA with value at memory address stored in registerB
+        """
+        self.reg[ra] = self.ram[self.reg[rb]]
+
+    def _LDI(self, r, i):
+        """
+        Stores immediate i into register r
+        """
+        self.reg[r] = 0b11111111 & i
+
+    def _ST(self, ra, rb):
+        """
+        Stores value from registerB into memory at address stored in registerA
+        """
+        self.ram[self.reg[ra]] = self.reg[rb]
 
     def _PUSH(self, r):
         """
@@ -307,6 +329,67 @@ class CPU:
         # Inc SP
         self.reg[self.spr] += 1
 
+    def _INT(self, r):
+        """
+        Issue interrupt number stored in register r
+        Sets nth_bit in register IS
+        """
+        pass
+
+    def _IRET(self):
+        """
+        Returns from interrupt (Restores processor state)
+        """
+        pass
+
+    def _JMP(self, r):
+        """
+        Jumps to address in register r
+        """
+        self.pc = self.reg[r]
+
+    def _JLT(self, r):
+        """
+        Jumps to address in register r if less-than flag is set
+        """
+        if self.fl & 0b00000100:
+            self.pc = self.reg[r]
+
+    def _JGT(self, r):
+        """
+        Jumps to address in register r if greater-than flag is set
+        """
+        if self.fl & 0b00000010:
+            self.pc = self.reg[r]
+
+    def _JEQ(self, r):
+        """
+        Jumps to address in register r if equal flag is set
+        """
+        if self.fl & 0b00000001:
+            self.pc = self.reg[r]
+
+    def _JLE(self, r):
+        """
+        Jumps to address in register r if less-than or equal flag is set
+        """
+        if self.fl & 0b00000101:
+            self.pc = self.reg[r]
+
+    def _JGE(self, r):
+        """
+        Jumps to address in register r if equal flag or greater-than flag is set
+        """
+        if self.fl & 0b00000011:
+            self.pc = self.reg[r]
+
+    def _JNE(self, r):
+        """
+        If equal flag not set, jump to address in register r
+        """
+        if self.fl ^ 0b00000001:
+            self.pc = self.reg[r]
+
     """
     ******************************************************
     ALU INSTRUCTION DEFINITIONS
@@ -316,19 +399,19 @@ class CPU:
         """
         Adds registerA with registerB, stores result in registerA
         """
-        self.reg[ra] += self.reg[rb]
+        self.reg[ra] = (self.reg[ra] + self.reg[rb]) & 0b11111111
 
     def _ALU_SUB(self, ra, rb):
         """
         Subtracts registerB from registerA, stores result in registerA        
         """
-        self.reg[ra] = self.reg[ra] - self.reg[rb]
+        self.reg[ra] = (self.reg[ra] - self.reg[rb]) & 0b11111111
     
     def _ALU_MUL(self, ra, rb):
         """
         Multiplies registerA with registerB, stores result in registerA
         """
-        self.reg[ra] *= self.reg[rb]
+        self.reg[ra] = (self.reg[ra] * self.reg[rb]) & 0b11111111
 
     def _ALU_DIV(self, ra, rb):
         """
@@ -350,19 +433,19 @@ class CPU:
             print("Cannot divide by 0!")
             exit()
         else:
-            self.reg[ra] = self.reg[ra] % self.reg[rb]
+            self.reg[ra] = int(self.reg[ra] % self.reg[rb])
 
     def _ALU_INC(self, r):
         """
         Increments register r        
         """
-        self.reg[r] += 1
+        self.reg[r] = (self.reg[r] + 1) & 0b11111111
         
     def _ALU_DEC(self, r):
         """
         Decrements register r        
         """
-        self.reg[r] -= 1
+        self.reg[r] = (self.reg[r] - 1) & 0b11111111
 
     def _ALU_AND(self, ra, rb):
         """
@@ -392,7 +475,7 @@ class CPU:
         """
         Shifts value in registerA left by number of bits in registerB
         """
-        self.reg[ra] = self.reg[ra] << self.reg[rb]
+        self.reg[ra] = (self.reg[ra] << self.reg[rb]) & 0b11111111
     
     def _ALU_SHR(self, ra, rb):
         """
