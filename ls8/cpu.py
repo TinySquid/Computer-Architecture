@@ -319,8 +319,13 @@ class CPU:
         """
         Push value in register r onto stack
         """
-        # Decrement stack pointer
-        self.reg[self.spr] -= 1
+
+        # Decrement SP
+        if self.reg[self.spr] == 0:
+            # Loop SP
+            self.reg[self.spr] = 0xFF
+        else:
+            self.reg[self.spr] -= 1
 
         # Copy value from register r to stack at address SP
         self.ram[self.reg[self.spr]] = self.reg[r]
@@ -333,7 +338,11 @@ class CPU:
         self.reg[r] = self.ram[self.reg[self.spr]]
 
         # Increment SP
-        self.reg[self.spr] += 1
+        if self.reg[self.spr] == 0xFF:
+            # Loop SP
+            self.reg[self.spr] = 0
+        else:
+            self.reg[self.spr] += 1
 
     def _CALL(self, r):
         """
