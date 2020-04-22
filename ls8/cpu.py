@@ -50,18 +50,24 @@ class CPU:
         self.instructions = {
             # HLT
             0x01: lambda: exit(),
-            # LDI
-            0x82: lambda: self._LDI(self._operand_a, self._operand_b),
+            # RET
+            0x11: lambda: self._RET(),
             # PUSH
             0x45: lambda: self._PUSH(self._operand_a),
             # POP
             0x46: lambda: self._POP(self._operand_a),
             # PRN
             0x47: lambda: self._PRN(self._operand_a),
+            # CALL
+            0x50: lambda: self._CALL(self._operand_a),
+            # LDI
+            0x82: lambda: self._LDI(self._operand_a, self._operand_b),
         }
 
         # All alu instructions
         self.alu_instructions = {
+            # ADD
+            0xA0: lambda: self._ALU_ADD(self._operand_a, self._operand_b),
             # MUL
             0xA2: lambda: self._ALU_MUL(self._operand_a, self._operand_b),
         }
@@ -191,9 +197,14 @@ class CPU:
                 self._trace()
                 exit(1)
 
-        # Increment program counter by instruction length
-        # Determined by last 2 bits of instruction for the operands + 1 for the instruction itself
-        self.pc += 1 + operands
+        # Does this instruction set the PC directly?
+        updates_pc = True if 0b00010000 & self.ir else False
+
+        # If the instruction doesn't set the PC itself, then we must increment it ourselves
+        if not updates_pc:
+            # Increment program counter by instruction length
+            # Determined by last 2 bits of instruction for the operands + 1 for the instruction itself
+            self.pc += 1 + operands
 
     def run(self, trace_cycle=False):
         """Starts the emulator execution loop"""
@@ -238,7 +249,8 @@ class CPU:
         """
         # Decrement stack pointer
         self.reg[self.spr] -= 1
-        # Copy value from register r to stack at address from SP
+
+        # Copy value from register r to stack at address SP
         self.ram[self.reg[self.spr]] = self.reg[r]
 
     def _POP(self, r):
@@ -249,6 +261,26 @@ class CPU:
         self.reg[r] = self.ram[self.reg[self.spr]]
 
         # Increment SP
+        self.reg[self.spr] += 1
+
+    def _CALL(self, r):
+        """
+        Pushes PC + 2 onto stack and then jumps to address in register r
+        """
+        # Dec SP
+        self.reg[self.spr] -= 1
+        # Push next instruction address onto stack
+        self.ram[self.reg[self.spr]] = self.pc + 2
+        # Set PC to address stored in register r
+        self.pc = self.reg[r]
+
+    def _RET(self):
+        """
+        Pops address from previous CALL and stores it in PC
+        """
+        # Pop ram[SP] into PC
+        self.pc = self.ram[self.reg[self.spr]]
+        # Inc SP
         self.reg[self.spr] += 1
 
     """
@@ -262,3 +294,9 @@ class CPU:
         Multiplies registerA with registerB, stores result in registerA
         """
         self.reg[ra] *= self.reg[rb]
+
+    def _ALU_ADD(self, ra, rb):
+        """
+        Adds registerA with registerB, stores result in registerA
+        """
+        self.reg[ra] += self.reg[rb]
