@@ -48,20 +48,46 @@ class CPU:
 
         # All non-alu instructions understood by the CPU
         self.instructions = {
+            # NOP
+            0x00: lambda: self._NOP(),
             # HLT
             0x01: lambda: exit(),
-            # RET
-            0x11: lambda: self._RET(),
+            # PRA
+            0x48: lambda: self._PRA(self._operand_a),
+            # PRN
+            0x47: lambda: self._PRN(self._operand_a),
+            # LD
+            0x83: lambda: self._LD(self._operand_a, self._operand_b),
+            # LDI
+            0x82: lambda: self._LDI(self._operand_a, self._operand_b),
+            # ST
+            0x84: lambda: self._ST(self._operand_a, self._operand_b),
             # PUSH
             0x45: lambda: self._PUSH(self._operand_a),
             # POP
             0x46: lambda: self._POP(self._operand_a),
-            # PRN
-            0x47: lambda: self._PRN(self._operand_a),
             # CALL
             0x50: lambda: self._CALL(self._operand_a),
-            # LDI
-            0x82: lambda: self._LDI(self._operand_a, self._operand_b),
+            # RET
+            0x11: lambda: self._RET(),
+            # INT
+            0x52: lambda: self._INT(self._operand_a),
+            # IRET
+            0x13: lambda: self._IRET(),
+            # JMP
+            0x54: lambda: self._JMP(self._operand_a),
+            # JLT
+            0x58: lambda: self._JLT(self._operand_a),
+            # JGT
+            0x57: lambda: self._JGT(self._operand_a),
+            # JEQ
+            0x55: lambda: self._JEQ(self._operand_a),
+            # JLE
+            0x59: lambda: self._JLE(self._operand_a),
+            # JGE
+            0x5A: lambda: self._JGE(self._operand_a),
+            # JNE
+            0x56: lambda: self._JNE(self._operand_a)
         }
 
         # All alu instructions
@@ -249,15 +275,15 @@ class CPU:
     ******************************************************
     """
 
+    def _NOP(self):
+        # Do nothing
+        pass
+
     def _HLT(self):
         """
         Halts program execution
         """
         exit()
-
-    def _NOP(self):
-        # Do nothing
-        pass
 
     def _PRA(self, r):
         """
@@ -354,6 +380,8 @@ class CPU:
         """
         if self.fl & 0b00000100:
             self.pc = self.reg[r]
+        else:
+            self.pc += 2
 
     def _JGT(self, r):
         """
@@ -361,6 +389,8 @@ class CPU:
         """
         if self.fl & 0b00000010:
             self.pc = self.reg[r]
+        else:
+            self.pc += 2
 
     def _JEQ(self, r):
         """
@@ -368,6 +398,8 @@ class CPU:
         """
         if self.fl & 0b00000001:
             self.pc = self.reg[r]
+        else:
+            self.pc += 2
 
     def _JLE(self, r):
         """
@@ -375,6 +407,8 @@ class CPU:
         """
         if self.fl & 0b00000101:
             self.pc = self.reg[r]
+        else:
+            self.pc += 2
 
     def _JGE(self, r):
         """
@@ -382,6 +416,8 @@ class CPU:
         """
         if self.fl & 0b00000011:
             self.pc = self.reg[r]
+        else:
+            self.pc += 2
 
     def _JNE(self, r):
         """
@@ -389,6 +425,8 @@ class CPU:
         """
         if self.fl ^ 0b00000001:
             self.pc = self.reg[r]
+        else:
+            self.pc += 2
 
     """
     ******************************************************
