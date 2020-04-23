@@ -1,7 +1,7 @@
 """CPU functionality."""
 
 import sys
-from time import time
+from time import time, sleep
 
 
 class CPU:
@@ -16,14 +16,6 @@ class CPU:
         # Instruction Register
         # Holds currently executing instruction
         self.ir = 0
-
-        # Memory Address Register
-        # Holds address of memory to read from / write to
-        # self.mar = 0
-
-        # Memory Data Register
-        # Holds data to write / just read
-        # self.mdr = 0
 
         # Flag register
         # Holds current flags status, changed on CMP
@@ -311,10 +303,6 @@ class CPU:
 
         # Timer setup
         timer_start = time()
-        # timer_error_margin = 0.05  # 5% error margin...
-
-        # Enable timer interrupt
-        # self.reg[self.imr] = self._set_nth_bit(self.reg[self.imr], 0)
 
         while True:
             # Prior to instruction fetch, check interrupts if enabled
@@ -338,6 +326,9 @@ class CPU:
                 self.reg[self.isr] = self._set_nth_bit(self.reg[self.isr], 0)
                 # Reset timer
                 timer_start = time()
+
+            # Sleep 5 ms to keep cpu usage down
+            sleep(0.005)
 
     """
     ******************************************************

@@ -5,6 +5,7 @@
 import sys
 from os import path
 from cpu import CPU
+from keyboard import Keyboard
 
 
 def print_usage(error: str) -> None:
@@ -28,8 +29,15 @@ if __name__ == "__main__":
         if path.exists(input_file):
             # Create instance
             emulator = CPU()
+
+            # Initialize keyboard
+            keyboard = Keyboard(emulator)
+
             # Load program
             emulator.load(input_file)
+
+            # Connect keyboard (starts polling thread)
+            keyboard.connect()
 
             # Run without debug trace mode
             if args_len == 2:
